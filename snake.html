@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game Realistis</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+        .game-container {
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            text-align: center;
+        }
+        h1 { margin-bottom: 20px; font-size: 2.5rem; color: #ecf0f1; }
+        .game-info { display: flex; justify-content: space-around; margin-bottom: 20px; font-size: 1.2rem; }
+        .score { color: #f39c12; font-weight: bold; }
+        canvas { border: 3px solid #ecf0f1; border-radius: 10px; background: #1a252f; display: block; margin: 0 auto 20px; }
+        .controls { margin-top: 20px; font-size: 0.9rem; color: #bdc3c7; }
+        .controls h3 { margin-bottom: 10px; color: #ecf0f1; }
+        .controls-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-width: 200px; margin: 0 auto; }
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1); border: 2px solid #ecf0f1; color: white;
+            padding: 15px; border-radius: 8px; cursor: pointer; font-size: 1.5rem;
+            transition: all 0.2s ease;
+        }
+        .control-btn:hover { background: rgba(255, 255, 255, 0.2); transform: scale(1.1); }
+        .control-btn:active { background: rgba(255, 255, 255, 0.3); transform: scale(0.95); }
+        .game-over { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9);
+            display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .game-over-content { text-align: center; background: #34495e; padding: 40px; border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5); }
+        .game-over h2 { font-size: 3rem; margin-bottom: 20px; color: #e74c3c; }
+        .final-score { font-size: 1.5rem; margin-bottom: 30px; color: #f39c12; }
+        .restart-btn {
+            background: linear-gradient(45deg, #27ae60, #2ecc71); color: white; border: none;
+            padding: 15px 30px; border-radius: 25px; font-size: 1.2rem; font-weight: bold;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+        .restart-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(39, 174, 96, 0.4); }
+        .back-btn {
+            position: absolute; top: 20px; left: 20px; background: rgba(255, 255, 255, 0.1);
+            color: white; border: 2px solid #ecf0f1; padding: 10px 20px; border-radius: 25px;
+            cursor: pointer; font-weight: 500; transition: all 0.3s ease; text-decoration: none;
+        }
+        .back-btn:hover { background: rgba(255, 255, 255, 0.2); transform: translateY(-2px); }
+        @media (max-width: 768px) {
+            .game-container { padding: 20px; margin: 20px; }
+            h1 { font-size: 2rem; }
+            canvas { width: 100%; max-width: 300px; height: auto; }
+            .controls-grid { max-width: 150px; }
+            .control-btn { padding: 10px; font-size: 1.2rem; }
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-btn">Kembali</a>
+    <div class="game-container">
+        <h1>🐍 Realistic Snake Game</h1>
+        <div class="game-info">
+            <div>Score: <span class="score" id="score">0</span></div>
+            <div>High Score: <span class="score" id="highScore">0</span></div>
+        </div>
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <div class="controls">
+            <h3>Kontrol:</h3>
+            <div class="controls-grid">
+                <div></div>
+                <button class="control-btn" id="upBtn">↑</button>
+                <div></div>
+                <button class="control-btn" id="leftBtn">←</button>
+                <button class="control-btn" id="downBtn">↓</button>
+                <button class="control-btn" id="rightBtn">→</button>
+            </div>
+            <p>Gunakan keyboard arrow keys atau tombol di atas</p>
+        </div>
+    </div>
+
+    <script>
+        class SnakeGame {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.scoreElement = document.getElementById('score');
+                this.highScoreElement = document.getElementById('highScore');
+
+                this.gridSize = 20;
+                this.tileCount = this.canvas.width / this.gridSize;
+
+                this.snake = [{x: 10, y: 10}];
+                this.food = {};
+                this.dx = 0;
+                this.dy = 0;
+                this.score = 0;
+                this.highScore = localStorage.getItem('snakeHighScore') || 0;
+                this.gameRunning = false;
+
+                this.highScoreElement.textContent = this.highScore;
+
+                // Load texture
+                this.snakePattern = new Image();
+                this.snakePattern.src = 'https://media.istockphoto.com/id/934364808/vector/seamless-texture-with-a-reptile-skin-snake-skin.jpg?s=612x612&w=0&k=20&c=2gGwzL5jNfyqqP_cbzDRtLotmfomYkHo4y00Hj_eCIw=';
+                this.snakePattern.onload = () => { this.pattern = this.ctx.createPattern(this.snakePattern, 'repeat'); };
+
+                this.appleImg = new Image();
+                this.appleImg.src = 'https://thumbs.dreamstime.com/b/apple-red-illustration-ripe-red-apple-fruit-realistic-vector-illustration-bright-red-apple-showcasing-smooth-shading-369408809.jpg';
+
+                this.generateFood();
+                this.bindEvents();
+                this.gameLoop();
+            }
+
+            bindEvents() {
+                // Same as before...
+                document.addEventListener('keydown', (e) => {
+                    if (!this.gameRunning) this.gameRunning = true;
+                    const key = e.key;
+                    if (key === 'ArrowLeft' && this.dx === 0) { this.dx = -1; this.dy = 0; }
+                    else if (key === 'ArrowUp' && this.dy === 0) { this.dx = 0; this.dy = -1; }
+                    else if (key === 'ArrowRight' && this.dx === 0) { this.dx = 1; this.dy = 0; }
+                    else if (key === 'ArrowDown' && this.dy === 0) { this.dx = 0; this.dy = 1; }
+                });
+
+                document.getElementById('upBtn').onclick = () => { if (this.dy === 0) { this.dx = 0; this.dy = -1; this.gameRunning = true; }};
+                document.getElementById('downBtn').onclick = () => { if (this.dy === 0) { this.dx = 0; this.dy = 1; this.gameRunning = true; }};
+                document.getElementById('leftBtn').onclick = () => { if (this.dx === 0) { this.dx = -1; this.dy = 0; this.gameRunning = true; }};
+                document.getElementById('rightBtn').onclick = () => { if (this.dx === 0) { this.dx = 1; this.dy = 0; this.gameRunning = true; }};
+            }
+
+            generateFood() {
+                this.food = {
+                    x: Math.floor(Math.random() * this.tileCount),
+                    y: Math.floor(Math.random() * this.tileCount)
+                };
+                for (let segment of this.snake) {
+                    if (segment.x === this.food.x && segment.y === this.food.y) {
+                        this.generateFood();
+                        return;
+                    }
+                }
+            }
+
+            draw() {
+                this.ctx.fillStyle = '#1a252f';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Draw snake body with pattern
+                if (this.pattern && this.snake.length > 1) {
+                    this.ctx.strokeStyle = this.pattern;
+                    this.ctx.lineWidth = this.gridSize - 4;
+                    this.ctx.lineCap = 'round';
+                    this.ctx.lineJoin = 'round';
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.shadowColor = 'rgba(0,0,0,0.5)';
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.snake[0].x * this.gridSize + this.gridSize / 2, this.snake[0].y * this.gridSize + this.gridSize / 2);
+                    for (let i = 1; i < this.snake.length; i++) {
+                        this.ctx.lineTo(this.snake[i].x * this.gridSize + this.gridSize / 2, this.snake[i].y * this.gridSize + this.gridSize / 2);
+                    }
+                    this.ctx.stroke();
+                    this.ctx.shadowBlur = 0;
+                }
+
+                // Draw head
+                const headX = this.snake[0].x * this.gridSize + this.gridSize / 2;
+                const headY = this.snake[0].y * this.gridSize + this.gridSize / 2;
+                this.ctx.fillStyle = '#27ae60';
+                this.ctx.beginPath();
+                this.ctx.arc(headX, headY, this.gridSize / 2 - 2, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Eyes (facing direction)
+                this.ctx.fillStyle = 'white';
+                let eyeOffsetX = 0, eyeOffsetY = 0;
+                if (this.dx === 1) eyeOffsetX = 5;      // right
+                else if (this.dx === -1) eyeOffsetX = -5; // left
+                else if (this.dy === -1) eyeOffsetY = -5; // up
+                else if (this.dy === 1) eyeOffsetY = 5;   // down
+
+                this.ctx.beginPath();
+                this.ctx.arc(headX + eyeOffsetX - 3, headY + eyeOffsetY - 3, 3, 0, Math.PI * 2);
+                this.ctx.arc(headX + eyeOffsetX + 3, headY + eyeOffsetY - 3, 3, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                this.ctx.fillStyle = 'black';
+                this.ctx.beginPath();
+                this.ctx.arc(headX + eyeOffsetX - 3, headY + eyeOffsetY - 3, 1.5, 0, Math.PI * 2);
+                this.ctx.arc(headX + eyeOffsetX + 3, headY + eyeOffsetY - 3, 1.5, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Draw apple
+                if (this.appleImg.complete) {
+                    this.ctx.drawImage(this.appleImg,
+                        this.food.x * this.gridSize + 2,
+                        this.food.y * this.gridSize + 2,
+                        this.gridSize - 4, this.gridSize - 4);
+                } else {
+                    // fallback
+                    this.ctx.fillStyle = '#e74c3c';
+                    this.ctx.fillRect(this.food.x * this.gridSize + 2, this.food.y * this.gridSize + 2, this.gridSize - 4, this.gridSize - 4);
+                }
+            }
+
+            update() {
+                if (!this.gameRunning) return;
+                const head = {x: this.snake[0].x + this.dx, y: this.snake[0].y + this.dy};
+
+                if (head.x < 0 || head.x >= this.tileCount || head.y < 0 || head.y >= this.tileCount) {
+                    this.gameOver(); return;
+                }
+                for (let segment of this.snake) {
+                    if (head.x === segment.x && head.y === segment.y) {
+                        this.gameOver(); return;
+                    }
+                }
+
+                this.snake.unshift(head);
+
+                if (head.x === this.food.x && head.y === this.food.y) {
+                    this.score += 10;
+                    this.scoreElement.textContent = this.score;
+                    this.generateFood();
+                } else {
+                    this.snake.pop();
+                }
+            }
+
+            gameOver() {
+                this.gameRunning = false;
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('snakeHighScore', this.highScore);
+                    this.highScoreElement.textContent = this.highScore;
+                }
+                const gameOverDiv = document.createElement('div');
+                gameOverDiv.className = 'game-over';
+                gameOverDiv.innerHTML = `
+                    <div class="game-over-content">
+                        <h2>Game Over!</h2>
+                        <div class="final-score">Score: ${this.score}</div>
+                        <button class="restart-btn" onclick="location.reload()">Main Lagi</button>
+                    </div>
+                `;
+                document.body.appendChild(gameOverDiv);
+            }
+
+            gameLoop() {
+                this.update();
+                this.draw();
+                setTimeout(() => this.gameLoop(), 200); // Lebih lambat untuk feel realistis
+            }
+        }
+
+        const game = new SnakeGame();
+    </script>
+</body>
+</html>
